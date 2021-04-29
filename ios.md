@@ -1789,6 +1789,617 @@ Student *s1 = [Student new];
 
 ##### 使用场景
 
+延展单独写一个.h文件的话，引入头文件就可以使用本类的属性和方法，但是一般不建议这么做。
+
+延展一般不会单独写一个.h头文件，而是直接写在本类的.m文件中。注意写在.m文件中的延展中的属性和方法都只能在本类中进行访问，外部无法进行访问的。因为此时延展不在本类的.h文件中。
+
+![image-20210426210628450](image/image-20210426210628450.png)
+
+![image-20210426210901044](image/image-20210426210901044.png)
+
+```objective-c
+// Student.h
+#import <Foundation/Foundation.h>
+@interface Student : NSObject
+- (void) hehe;
+@end
+
+// Student.m
+#import "Student.h"
+@interface Student ()  // 延展
+@property(nonatomic,assign) int age;  // 真私有属性
+
+- (void) study;  // 私有方法，等价于在@implementation中只写实现不写声明，但是不建议这么做
+@end
+    
+@implement Student
+- (void) study{
+    NSLog(@"xuexi");  // 外部无法直接访问，因为声明在延展中
+}
+
+- (void) hehe{
+    NSLog(@"hehehe");
+}
+@end
+```
 
 
-### block
+
+#### block
+
+##### 概念
+
+![image-20210426211440391](image/image-20210426211440391.png)
+
+##### 基本使用
+
+block变量的声明（类似C++的函数指针？）：
+
+![image-20210426211935054](image/image-20210426211935054.png)
+
+![image-20210426215014658](image/image-20210426215014658.png)
+
+执行方式：有参数传参数，有返回值就接。
+
+![image-20210426215829891](image/image-20210426215829891.png)
+
+```objective-c
+// void (^myBlock1) () = ^void(){
+// 简写：
+ void (^myBlock1) () = ^(){
+    NSLog(@"niubi");
+}  // 无参无返回值的block
+myBlock1();
+
+// int (^myBlock2) () = ^int(){
+// 简写：
+int (^myBlock2) () = ^int{
+    int num1 = 10 + 20;
+    return num1;
+}  // 返回值是int的block
+int res = myBlock2();
+
+// int (^myBlock3) (int a,int b) = ^int(int a,int b){
+// 简写：
+int (^myBlock3) (int,int) = ^int(int a,int b){
+    int num2 = a + b;
+    return num2;
+}  // 既有返回值，又有参数
+int ans = myBlock3(10,20);
+```
+
+##### block简写
+
+不建议简写，还是写全比较好，便于代码阅读。
+
+![image-20210426220322505](image/image-20210426220322505.png)
+
+![image-20210426220528148](image/image-20210426220528148.png)
+
+##### 使用typedef简化block定义
+
+![image-20210426221210950](image/image-20210426221210950.png)
+
+```objective-c
+typedef int (^NewType) (int a,int b);
+NewType block1 = ^int(int a,int b){
+    int num1 = a + b;
+    return num1;
+}
+```
+
+##### block块访问外部变量
+
+![image-20210426221912655](image/image-20210426221912655.png)
+
+##### block作为函数的参数
+
+![image-20210426222855130](image/image-20210426222855130.png)
+
+![image-20210426223017256](image/image-20210426223017256.png)
+
+![image-20210426223635278](image/image-20210426223635278.png)
+
+```objective-c
+// main.m
+#import <Foundation/Foundation.h>
+typedef int (^NewType)(int a,int b);  // 定义一个新类型，block类型NewType
+
+void test(NewType block1){
+    NSLog(@"hello");
+    int sum = block1(10,20);
+    NSLog("sum = %d",sum);
+    NSLog(@"heihe");
+}
+
+int main(){
+    NewType block1 = ^int(int a,int b){
+        return a+b;
+    }
+    test(block1);
+    // 等价于
+    test(^int(int a,int b){
+        return a+b;
+    });
+    return 0;
+}
+```
+
+![image-20210427203937230](image/image-20210427203937230.png)
+
+##### block作为函数的返回值
+
+实际上很少返回一个block，也就是代码段。
+
+![image-20210427213313808](image/image-20210427213313808.png)
+
+##### block和函数的异同
+
+![image-20210427213506048](image/image-20210427213506048.png)
+
+
+
+#### 协议
+
+##### 基本使用
+
+作用（类似java中的接口？）：
+
+![image-20210427214737440](image/image-20210427214737440.png)
+
+![image-20210427214802405](image/image-20210427214802405.png)
+
+```objective-c
+// 声明一个协议
+// MyProtocal.h
+@protocal MyProtocal <NSObject>  // 声明协议
+- (void) run;
+- (void) sleep;
+@end
+    
+// Dog.h
+#import <Foundation/Foundation.h>
+#import "MyProtocal.h"
+@interface Dog : NSObject<MyProtocal>  // 表示遵守协议，那么拥有协议中声明的方法，无需自己定义，但需自己实现
+
+@end
+    
+// Dog.m
+#import "Dog.h"
+@implement Dog
+- (void) run{
+    NSLog(@"gogogo");
+}
+- (void) sleep{
+    NSLog(@"i go bed");
+}
+@end
+```
+
+![image-20210427214456884](image/image-20210427214456884.png)
+
+类只能单继承，但是可以多遵守。拥有多个协议声明的方法。
+
+类继承与遵守协议无关。
+
+![image-20210427215303593](image/image-20210427215303593.png)
+
+##### @required和@optional
+
+用来修饰协议中的方法的关键字。
+
+![image-20210428153920292](image/image-20210428153920292.png)
+
+##### 协议之间的继承
+
+语法：
+
+```objective-c
+// 父协议.h
+@protocal 父协议 <NSObject>  // 这里的NSObject是一个协议，不同于类继承的NSObject
+- (void) playLOL;
+@end
+
+// 子协议.h
+#import "父协议.h"
+@protocal 子协议名 <父协议名>
+// 继承父协议的所有方法声明
+- (void) paShan;
+@end
+    
+// Person.h 
+#import <Foundation/Foundation.h>
+#import "子协议.h"
+@interface Person : NSObject<子协议名>
+@end
+    
+// Person.m
+#import "Person.h"
+@implement Person
+- (void) playLOL{
+    
+}
+- (void) paShan{
+    
+}
+@end
+```
+
+实际上，类和协议是可以同名的，**在OC中，有一个类NSObject和一个协议NSObjet**，这个类NSObjet遵守协议NSObjet，因此拥有NSObjet中所有方法的声明。
+
+![image-20210428161722731](image/image-20210428161722731.png)
+
+##### 协议的类型限制
+
+声明一个指针变量，使其指向的对象遵守一个或多个协议。
+
+![image-20210428163455904](image/image-20210428163455904.png)
+
+![image-20210428163549843](image/image-20210428163549843.png)
+
+```objective-c
+Student<StudyProtocal> *stu = [Student new];
+[stu study];
+```
+
+![image-20210428163637422](image/image-20210428163637422.png)
+
+
+
+### 160 代理设计模式
+
+```objective-c
+// GFProtocal.h
+@protocal GFProtocal <NSObject>
+@required
+- (void) wash;
+- (void) cook;
+
+@optional
+- (void) job;
+@end
+    
+// Girl.h
+#import <Foundation/Foundation.h>
+#import "GFProtocal.h"
+@interface Girl : NSObject <GFProtocal>
+@property(nonatomic,assign) NSString *name
+@end
+    
+// Girl.m
+#import "Girl.h"
+@implement Girl
+- (void) wash{
+    NSLog(@"衣服洗好了");
+}
+- (void) cook{
+    NSLog(@"饭煮好了");
+}
+- (void) job{
+    
+}
+@end
+    
+// Boy.h
+#import <Foundation/Foundation.h>
+#import "GFProtocal.h"
+@interface Boy : NSObject
+@property(nonatomic,strong) NSString *name;
+@property(nonatomic,assign) int age;
+@property(nonatomic,assign) int money;
+@property(nonatomic,strong) id<GFProtocal> girlFriend;  // 女朋友对象需要遵守协议才行
+
+- (void) talkLove;
+@end
+    
+// Boy.m
+#import "Boy.h"
+@implement Boy
+- (void) talkLove{
+    NSLog(@"哈尼我回来了");
+    [_girlFriend wash];
+    [_girlFriend cook];
+    NSLog(@"结束");
+}
+@end
+    
+// main.m
+#import <Foundation/Foundation.h>
+#import "Boy.h"
+#import "Girl.h"
+    
+int main(){
+    Boy *b1 = [Boy new];
+    b1.name = @"lrr";
+    b1.age = 24;
+    b1.money = 10000;
+    
+    Girl *g1 = [Girl new];
+    g1.name = @"kk";
+    b1.girlFriend = g1;
+    [b1 talkLove];
+    
+    return 0;
+}
+```
+
+
+
+### 163 NSString
+
+![image-20210428172648025](image/image-20210428172648025.png)
+
+![image-20210428172859220](image/image-20210428172859220.png)
+
+#### 字符串的恒定性
+
+![image-20210428210948871](image/image-20210428210948871.png)
+
+![image-20210428211042258](image/image-20210428211042258.png)
+
+类似与C++中指向常量的指针？指针指向的地址存储的内容是不可变的。但是指针可以指向新的地址。
+
+![image-20210428211310207](image/image-20210428211310207.png)
+
+#### NSString常用方法
+
+![image-20210428211736040](image/image-20210428211736040.png)
+
+比较字符串是否相等：
+
+![image-20210428212419609](image/image-20210428212419609.png)
+
+将C语言字符串转换为OC字符串对象：
+
+```objective-c
++ (instancetype) stringWithUTF8String:(NSString *) string;
+```
+
+![image-20210428212656080](image/image-20210428212656080.png)
+
+```objective-c
+NSString *name = @"lrr";
+const char *s = name.UTF8String;
+```
+
+#### 字符串的读写
+
+![image-20210428215342134](image/image-20210428215342134.png)
+
+![image-20210428215546338](image/image-20210428215546338.png)
+
+#### NSURL
+
+![image-20210428220207469](image/image-20210428220207469.png)
+
+```objective-c
+// main.h
+#import <Foundation/Foundation.h>
+int main(){
+    NSURL *u1 = [NSURL URLWithString:@"file:///User/itcast/Desktop/1.txt"];
+    // 读文件
+    NSString *str = [NSString stringWithContentsOfURL:u1 encoding:NSUTF8StringEncoding error:nil];
+    NSLog(@"%@",str);
+    
+    // 写文件
+    NSString * str2 = @"hello";
+    BOOL res = [str2 writeToURL:u1 atomically:NO encoding:NSUTF8StringEncoding error:nil];
+    if(res != nil){
+        // 写入失败
+    }
+    else{
+        NSLog(@"写入成功");
+    }
+    return 0;
+}
+```
+
+#### 字符串比较
+
+使用对象方法compare：
+
+![image-20210428221151430](image/image-20210428221151430.png)
+
+ 使用compare忽略大小写的比较：
+
+![image-20210428221540689](image/image-20210428221540689.png)
+
+#### 字符串的开始和结束判断
+
+![image-20210428221822547](image/image-20210428221822547.png)
+
+#### 字符串的搜索
+
+rangeOfString
+
+![image-20210428222356786](image/image-20210428222356786.png)
+
+![image-20210428222211308](image/image-20210428222211308.png)
+
+![image-20210428222455140](image/image-20210428222455140.png)
+
+#### NSSRange
+
+![image-20210428225922416](image/image-20210428225922416.png)
+
+![image-20210428230053658](image/image-20210428230053658.png)
+
+#### 字符串的截取
+
+![image-20210428230423750](image/image-20210428230423750.png)
+
+![image-20210428230508657](image/image-20210428230508657.png)
+
+#### 字符串替换
+
+![image-20210428231000699](image/image-20210428231000699.png)
+
+![image-20210428230709521](image/image-20210428230709521.png)
+
+#### 字符串的类型转换（*）
+
+![image-20210428231816430](image/image-20210428231816430.png)
+
+#### 字符串的其他方法（175）
+
+![image-20210428232301344](image/image-20210428232301344.png)
+
+
+
+### 176 NSMutableString
+
+![image-20210429094752149](image/image-20210429094752149.png)
+
+#### 基本使用
+
+![image-20210429100051846](image/image-20210429100051846.png)
+
+```objective-c
+NSMutableString *str = [NSMutableString string];
+[str appendString:@"lrr"];  // 追加字符串
+int age = 24;
+[str appendFormat:@" 我今年%d岁了",age];
+NSLog(@"%@",str);
+```
+
+![image-20210429100215231](image/image-20210429100215231.png)
+
+![image-20210429100159796](image/image-20210429100159796.png)
+
+编译不会报错，但是运行报错，因为使用子类指针指向父类对象，编译时只检查指针变量是否有这个方法，但是运行时会检查指针指向的对象中是否真的有这个方法。
+
+![image-20210429100440358](image/image-20210429100440358.png)
+
+#### 使用建议
+
+![image-20210429100735443](image/image-20210429100735443.png)
+
+
+
+### 178 NSArray
+
+#### 概述
+
+![image-20210429101207963](image/image-20210429101207963.png)
+
+#### NSArray创建
+
+```objective-c
+NSArray * arr = [NSArray arrayWithObjects:@"lrr",@"kk",nil];  // 尾部一定要加一个nil，表示结束
+// 等价于
+NSArray * arr1 = @[@"lrr",@"kk"];
+```
+
+#### 基本使用
+
+![image-20210429102432768](image/image-20210429102432768.png)
+
+##### 取出数组元素
+
+```objective-c
+// 直接使用下标
+NSArray *arr = @[@"lrr",@"kk"];
+NSLog(@"%@",arr[1]);
+
+// 使用函数objectAtIndex
+NSString *str = [arr objectAtIndex:1];
+NSLog(@"%@",str);
+
+// 注意，如果下标越界，直接报错
+```
+
+##### 得到数组大小
+
+![image-20210429103540268](image/image-20210429103540268.png)
+
+```objective-c
+NSUInteger res = arr.count;
+NSLog(@"lu",res);
+```
+
+##### 判断是否包含某元素
+
+![image-20210429103719863](image/image-20210429103719863.png)
+
+##### 查找指定元素的下标
+
+![image-20210429103823518](image/image-20210429103823518.png)
+
+![image-20210429103429298](image/image-20210429103429298.png)
+
+
+
+#### 数组遍历
+
+```objective-c
+NSArray *arr = @[@"lrr",@"kk"];
+
+// 常规for循环遍历
+for(int i=0;i<arr.count;i++){
+    NSLog(@"arr[%d] = %@",i,arr[i]);
+}
+
+// 增强for
+for(NSString *num in arr){
+    NSLog(@"%@",num);
+}
+```
+
+![image-20210429113456991](image/image-20210429113456991.png)
+
+##### 使用enumerateObjectsUsingBlock
+
+![image-20210429114114723](image/image-20210429114114723.png)
+
+
+
+#### NSArray与字符串的两个方法
+
+![image-20210429114701959](image/image-20210429114701959.png)
+
+```objective-c
+NSArray *arr = @[@"lrr",@"kk",@"ouyuan"];
+NSString *str = [arr componentsJoinedByString:@","];
+NSLog(@"%@",str);  // 输出lrr,kk,ouyuan
+
+NSString *str = @"lrr,kk,ouyuan";
+NSArray *arr = [str componentsSeperatedByString:@","];
+for(id str in arr){
+    NSLog(@"%@",str);
+}
+```
+
+
+
+### 182 NSMutableArray
+
+#### 创建
+
+![image-20210429115537945](image/image-20210429115537945.png)
+
+#### 插入
+
+![image-20210429120102569](image/image-20210429120102569.png)
+
+#### 删除
+
+![image-20210429120425463](image/image-20210429120425463.png)
+
+
+
+### 183 NSNumber
+
+![image-20210429152101320](image/image-20210429152101320.png)
+
+ 简写方式：
+
+![image-20210429152252844](image/image-20210429152252844.png)
+
+**@10**是NSNumber对象。
+
+```objective-c
+// 简便写法
+int num = 10;
+NSNumber *n1 = @(num);
+```
+
