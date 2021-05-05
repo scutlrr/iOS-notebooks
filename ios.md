@@ -2087,7 +2087,7 @@ Student<StudyProtocal> *stu = [Student new];
 @property(nonatomic,strong) NSString *name;
 @property(nonatomic,assign) int age;
 @property(nonatomic,assign) int money;
-@property(nonatomic,strong) id<GFProtocal> girlFriend;  // 女朋友对象需要遵守协议才行
+@property(nonatomic,strong) id<GFProtocal> girlFriend;  // 女朋友对象需要遵守协议才行，否则会有一个警告
 
 - (void) talkLove;
 @end
