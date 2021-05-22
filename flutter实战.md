@@ -4279,3 +4279,1103 @@ Future<DateTime> _showDatePicker2() {
 
 
 ### 八、事件处理与通知
+
+#### 1 原始指针事件处理
+
+![image-20210519094355090](image/image-20210519094355090.png)
+
+![image-20210519094607208](image/image-20210519094607208.png)
+
+Flutter中可以使用`Listener`来**监听原始触摸事件**：
+
+```dart
+Listener({
+  Key key,
+  this.onPointerDown, //手指按下回调  例如：(PointerDownEvent event) => setState(()=>_event=event),
+  this.onPointerMove, //手指移动回调
+  this.onPointerUp, //手指抬起回调
+  this.onPointerCancel, //触摸事件取消回调
+  this.behavior = HitTestBehavior.deferToChild, //在命中测试期间如何表现  枚举类，有三种值
+  Widget child
+})
+```
+
+`behavior`属性：
+
+- deferToChild：子组件会一个接一个的进行命中测试，如果子组件中有测试通过的，则当前组件通过，这就意味着，如果指针事件作用于子组件上时，其父级组件也肯定可以收到该事件。
+- `opaque`：在命中测试时，将当前组件当成不透明处理(即使本身是透明的)，最终的效果相当于当前Widget的整个区域都是点击区域。
+- `translucent`：当点击组件透明区域时，可以对自身边界内及底部可视区域都进行命中测试，这意味着点击顶部组件透明区域时，顶部组件和底部组件都可以接收到事件：
+
+```dart
+Stack(
+  children: <Widget>[
+    Listener(
+      child: ConstrainedBox(
+        constraints: BoxConstraints.tight(Size(300.0, 200.0)),
+        child: DecoratedBox(
+            decoration: BoxDecoration(color: Colors.blue)),
+      ),
+      onPointerDown: (event) => print("down0"),
+    ),
+    Listener(
+      child: ConstrainedBox(
+        constraints: BoxConstraints.tight(Size(200.0, 100.0)),
+        child: Center(child: Text("左上角200*100范围内非文本区域点击")),
+      ),
+      onPointerDown: (event) => print("down1"),
+      //behavior: HitTestBehavior.translucent, //放开此行注释后可以"点透"
+    )
+  ],
+)
+```
+
+![image-20210519101827257](image/image-20210519101827257.png)
+
+
+
+#### 2 手势识别
+
+##### GestureDetector
+
+`GestureDetector`是一个**用于手势识别的功能性组件**，我们通过它可以来识别各种手势。`GestureDetector`实际上是指针事件的语义化封装。
+
+###### 滑动、拖动
+
+`GestureDetector`对于拖动和滑动事件是没有区分的。
+
+```dart
+class _Drag extends StatefulWidget {
+  @override
+  _DragState createState() => new _DragState();
+}
+
+class _DragState extends State<_Drag> with SingleTickerProviderStateMixin {
+  double _top = 0.0; //距顶部的偏移
+  double _left = 0.0;//距左边的偏移
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          top: _top,
+          left: _left,
+          child: GestureDetector(
+            child: CircleAvatar(child: Text("A")),
+            //手指按下时会触发此回调
+            onPanDown: (DragDownDetails e) {
+              //打印手指按下的位置(相对于屏幕)
+              print("用户手指按下：${e.globalPosition}");
+            },
+            //手指滑动时会触发此回调
+            onPanUpdate: (DragUpdateDetails e) {
+              //用户手指滑动时，更新偏移，重新构建
+              setState(() {
+                _left += e.delta.dx;
+                _top += e.delta.dy;
+              });
+            },
+            onPanEnd: (DragEndDetails e){
+              //打印滑动结束时在x、y轴上的速度
+              print(e.velocity);
+            },
+          ),
+        )
+      ],
+    );
+  }
+}
+```
+
+
+
+###### 单一方向拖动
+
+```dart
+      body: Stack(
+        children: <Widget>[
+          Positioned(
+            left: _top,
+            child: GestureDetector(
+                child: CircleAvatar(child: Text("A")),
+                //垂直方向拖动事件
+                onHorizontalDragUpdate: (DragUpdateDetails details) {
+                  setState(() {
+                    _top += details.delta.dx;
+                  });
+                }),
+          )
+        ],
+      ),
+```
+
+
+
+###### 缩放
+
+```dart
+class _ScaleTestRouteState extends State<_ScaleTestRoute> {
+  double _width = 200.0; //通过修改图片宽度来达到缩放效果
+
+  @override
+  Widget build(BuildContext context) {
+   return Center(
+     child: GestureDetector(
+        //指定宽度，高度自适应
+        child: Image.asset("./images/sea.png", width: _width),
+        onScaleUpdate: (ScaleUpdateDetails details) {
+          setState(() {
+            //缩放倍数在0.8到10倍之间
+            _width=200*details.scale.clamp(.8, 10.0);
+          });
+        },
+      ),
+   );
+  }
+}
+```
+
+
+
+##### GestureRecognizer
+
+![image-20210519113222789](image/image-20210519113222789.png)
+
+使用`GestureRecognizer`后一定要调用其`dispose()`方法来释放资源（主要是取消内部的计时器）。
+
+
+
+##### 手势竞争与冲突
+
+![image-20210519115136408](image/image-20210519115136408.png)
+
+```dart
+Stack(
+      children: <Widget>[
+        Positioned(
+          top: _top,
+          left: _left,
+          child: GestureDetector(
+            child: CircleAvatar(child: Text("A")),
+            //垂直方向拖动事件
+            onVerticalDragUpdate: (DragUpdateDetails details) {
+              setState(() {
+                _top += details.delta.dy;
+              });
+            },
+            // 水平方向拖动事件
+            onHorizontalDragUpdate: (DragUpdateDetails details) {
+              setState(() {
+                _left += details.delta.dx;
+              });
+            },
+          ),
+        )
+      ],
+    )
+```
+
+
+
+###### 手势冲突解决
+
+通过Listener监听原始指针事件。手势冲突只是手势级别的，而手势是对原始指针的语义化的识别，所以在遇到复杂的冲突场景时，都可以通过`Listener`直接识别原始指针事件来解决冲突。
+
+```dart
+class _GestureRecognizerTestRouteState extends State<GestureRecognizerTestRoute> {
+  double _left = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Positioned(
+          top: 80,
+          left: _left,
+          child: Listener(
+            onPointerDown: (event) {
+              print("down");
+            },
+            onPointerUp: (event) {
+              print("up");
+            },
+            child: GestureDetector(
+              child: CircleAvatar(
+                child: Text("B"),
+              ),
+              onHorizontalDragUpdate: (details) {
+                setState(() {
+                  _left += details.delta.dx;
+                });
+              },
+              onHorizontalDragEnd: (details) {
+                print("onHorizontalDragEnd");
+              },
+            ),
+          ),
+        )
+      ],
+    );
+  }
+}
+```
+
+
+
+#### 3 事件总线
+
+事件总线通常实现了订阅者模式，订阅者模式包含发布者和订阅者两种角色，可以通过事件总线来触发事件和监听事件。
+
+```dart
+// typedef EventCallback = void Function(arg);
+typedef void EventCallback(arg);
+
+class EventBus {
+  // 私有命名构造函数
+  EventBus._internal();
+
+  // 保存实例
+  static EventBus _singleton = new EventBus._internal();
+
+  // 工厂构造函数获取实例
+  factory EventBus() => _singleton;
+
+  // 保存事件订阅者队列  键：事件  值：事件对应的订阅者队列，也就是回调函数
+  var _emap = new Map<Object, List<EventCallback>>();
+
+  // 添加订阅者
+  void on(eventName, EventCallback f) {
+    if (eventName == null || f == null) return;
+    _emap[eventName] ??= new List<EventCallback>();
+    _emap[eventName].add(f);
+  }
+
+  // 移除订阅者
+  void off(eventName, [EventCallback f]) {
+    var list = _emap[eventName];
+    if (eventName == null || list == null) return;
+    if (f == null) {
+      _emap[eventName] = null;
+    } else {
+      _emap[eventName].remove(f);
+    }
+  }
+
+  // 触发事件
+  void emit(eventName, [arg]) {
+    var list = _emap[eventName];
+    if (list == null) return;
+    int len = list.length;
+    //反向遍历，防止订阅者在回调中移除自身带来的下标错位
+    for (int i = len - 1; i >= 0; i--) {
+      list[i](arg);
+    }
+  }
+}
+
+// 使用方法尚未了解？？
+```
+
+Dart中实现单例模式的标准做法就是使用**static变量+工厂构造函数**的方式，这样就可以保证`new EventBus()`始终返回都是同一个实例。
+
+
+
+#### 4 Notification
+
+通知（Notification）是Flutter中一个重要的机制，在widget树中，每一个节点都可以分发通知，通知会沿着当前节点向上传递，所有父节点都可以通过`NotificationListener`来监听通知。这种由子向父的传递通知的机制称为**通知冒泡**。
+
+可以在上层节点任意位置来监听通知/事件，也可以终止冒泡过程，终止冒泡后，通知将不会再向上传递。
+
+```dart
+NotificationListener(
+  // 这里的notification类型是ScrollNotification
+  onNotification: (notification){
+    switch (notification.runtimeType){
+      case ScrollStartNotification: print("开始滚动"); break;
+      case ScrollUpdateNotification: print("正在滚动"); break;
+      case ScrollEndNotification: print("滚动停止"); break;
+      case OverscrollNotification: print("滚动到边界"); break;
+    }
+  },
+  child: ListView.builder(
+      itemCount: 100,
+      itemBuilder: (context, index) {
+        return ListTile(title: Text("$index"),);
+      }
+  ),
+);
+```
+
+```dart
+// NotificationListener 可以指定一个模板参数，该模板参数类型必须是继承自Notification；
+// 当显式指定模板参数时，NotificationListener 便只会接收该参数类型的通知。
+class NotificationListener<T extends Notification> extends StatelessWidget {
+  const NotificationListener({
+    Key key,
+    @required this.child,
+    this.onNotification,
+  }) : super(key: key);
+ ...//省略无关代码 
+}  
+```
+
+`onNotification`回调为通知处理回调：
+
+```dart
+typedef NotificationListenerCallback<T extends Notification> = bool Function(T notification);
+```
+
+它的返回值类型为布尔值，当返回值为`true`时，阻止冒泡，其父级Widget将再也收不到该通知；当返回值为`false` 时继续向上冒泡通知。
+
+
+
+##### 自定义通知
+
+```dart
+// MyNotification.dart
+import 'package:flutter/material.dart';
+
+class MyNotification extends Notification {
+  final String msg;
+  MyNotification(this.msg);
+}
+
+
+// main.dart
+class NotificationRoute extends StatefulWidget {
+  NotificationRoute({Key key}) : super(key: key);
+
+  @override
+  _NotificationRouteState createState() => _NotificationRouteState();
+}
+
+class _NotificationRouteState extends State<NotificationRoute> {
+  String _msg = "";
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<MyNotification>(
+      onNotification: (notification) {
+        setState(() {
+          _msg += notification.msg + " ";
+        });
+        return true;  // 阻止冒泡
+      },
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  child: Text("send notification"),
+                  onPressed: () => MyNotification("lrr").dispatch(context),
+                );
+              },
+            ),
+            Text(
+              _msg,
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+若两个`NotificationListener`进行了嵌套，子`NotificationListener`的`onNotification`回调返回了`false`，表示不阻止冒泡，所以父`NotificationListener`仍然会受到通知，所以控制台会打印出通知信息；如果将子`NotificationListener`的`onNotification`回调的返回值改为`true`，则父`NotificationListener`便不会再打印通知了，因为子`NotificationListener`已经终止通知冒泡了。
+
+
+
+##### 通知冒泡的原理
+
+```dart
+// 通知是通过Notification的dispatch(context)方法发出的
+void dispatch(BuildContext target) {
+  target?.visitAncestorElements(visitAncestor);
+}
+
+
+// dispatch(context)调用当前context的visitAncestorElements方法，该方法从当前Element开始向上遍历父级元素；
+// visitAncestorElements有一个遍历回调参数，在遍历过程中对遍历到的父级元素都会执行该回调。
+// 遍历的终止条件是：已经遍历到根Element或某个遍历回调返回false。
+// 遍历回调，会对每一个父级Element执行此回调
+bool visitAncestor(Element element) {
+  //判断当前element对应的Widget是否是NotificationListener。
+  
+  //由于NotificationListener是继承自StatelessWidget，
+  //故先判断是否是StatelessElement
+  if (element is StatelessElement) {
+    //是StatelessElement，则获取element对应的Widget，判断
+    //是否是NotificationListener 。
+    final StatelessWidget widget = element.widget;
+    if (widget is NotificationListener<Notification>) {
+      //是NotificationListener，则调用该NotificationListener的_dispatch方法
+      if (widget._dispatch(this, element)) 
+        return false;
+    }
+  }
+  return true;
+}
+
+
+  bool _dispatch(Notification notification, Element element) {
+    // 如果通知监听器不为空，并且当前通知类型是该NotificationListener
+    // 监听的通知类型，则调用当前NotificationListener的onNotification
+    if (onNotification != null && notification is T) {
+      final bool result = onNotification(notification);
+      // 返回值决定是否继续向上遍历
+      return result == true; 
+    }
+    return false;  // 继续向上冒泡？
+  }
+```
+
+
+
+### 九、十 暂未学习（*）
+
+
+
+### 十一、文件操作与网路请求
+
+#### 1 文件操作
+
+![image-20210519232014736](image/image-20210519232014736.png)
+
+```dart
+import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:async';
+import 'package:path_provider/path_provider.dart';
+
+main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      routes: {
+        '/': (context) => FileOperationRoute(),
+      },
+      initialRoute: '/',
+    );
+  }
+}
+
+class FileOperationRoute extends StatefulWidget {
+  FileOperationRoute({Key key}) : super(key: key);
+
+  @override
+  _FileOperationRouteState createState() => _FileOperationRouteState();
+}
+
+class _FileOperationRouteState extends State<FileOperationRoute> {
+  int _counter;
+
+  Future<File> _getLocalFile() async {
+    String dir = (await getApplicationDocumentsDirectory()).path;
+    return new File("$dir/counter.txt");
+  }
+
+  Future<int> _readCounter() async {
+    try {
+      File file = await _getLocalFile();
+      String counters = await file.readAsString();
+      return int.parse(counters);
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
+  Future<Null> _incrementCounter() async {
+    setState(() {
+      _counter++;
+    });
+    await (await _getLocalFile()).writeAsString('$_counter');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _readCounter().then((value) {
+      setState(() {
+        _counter = value;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("file op"),
+      ),
+      body: Center(
+        child: Text("$_counter"),
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        tooltip: 'increment',
+        onPressed: _incrementCounter,
+      ),
+    );
+  }
+}
+```
+
+
+
+#### 2 HttpClient发起HTTP请求
+
+```dart
+// 1.创建HTTPClient
+ HttpClient httpClient = new HttpClient();
+
+// 2.打开连接
+Uri uri=Uri(scheme: "https", host: "flutterchina.club", queryParameters: {
+    "xx":"xx",
+    "yy":"dd"
+  });
+HttpClientRequest request = await httpClient.getUrl(uri);
+// 可选操作：
+request.headers.add("user-agent", "test");
+
+// 3.等待连接服务器
+HttpClientResponse response = await request.close();
+
+// 4.读取响应信息
+String responseBody = await response.transform(utf8.decoder).join();
+
+// 5.请求结束，关闭HttpClient
+httpClient.close();
+```
+
+案例：
+
+```dart
+// 一开始不显示文本，点击按钮之后，执行异步方法，会率先更新UI，因为调用setState函数，此时文本显示“正在请求”；
+// 接下来进行Http请求，等待数据返回之后（执行完try），执行最后的finally函数体，再次更新UI，显示返回的内容？
+class _HttpTestRouteState extends State<HttpTestRoute> {
+  bool _loading = false;
+  String _text = "";
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("httpClient"),
+      ),
+      body: ConstrainedBox(
+        constraints: BoxConstraints.expand(),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              ElevatedButton(
+                child: Text("获取百度首页"),
+                onPressed: _loading
+                    ? null
+                    : () async {
+                        setState(() {
+                          _loading = true;
+                          _text = "正在请求";
+                        });
+                        try {
+                          print(_loading);
+                          HttpClient httpClient = new HttpClient();
+                          HttpClientRequest request = await httpClient.getUrl(Uri.parse("https://www.baidu.com"));
+                          request.headers.add("user-agent",
+                              "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1");
+                          HttpClientResponse response = await request.close();
+                          // print("数据返回");
+                          _text = await response.transform(utf8.decoder).join();
+                          httpClient.close();
+                        } catch (e) {
+                          _text = "请求失败";
+                        } finally {
+                          setState(() {
+                            // print("更新UI");
+                            _loading = false;
+                          });
+                        }
+                      },
+              ),
+              Container(
+                width: MediaQuery.of(context).size.width - 50,
+                child: Text(_text.replaceAll(new RegExp(r"\s"), "")),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+
+
+##### 请求认证
+
+![image-20210520221001568](image/image-20210520221001568.png)
+
+![image-20210520221104358](image/image-20210520221104358.png)
+
+
+
+#### 3 Http请求-Dio库
+
+dio是一个强大的Dart Http请求库，支持Restful API、FormData、拦截器、请求取消、Cookie管理、文件上传/下载、超时等。
+
+创建方式：
+
+```dart
+// 注意，一个dio实例可以发起多个http请求，一般来说，APP只有一个http数据源时，dio应该使用单例模式
+import 'package:dio/dio.dart';
+Dio dio =  Dio();
+```
+
+![image-20210520223548128](image/image-20210520223548128.png)
+
+案例：
+
+是如何做到在请求之后重新更新UI（请求完成之前显示的是加载框）？
+
+应该是由于FutureBuilder这个组件自身的特性：Creates a widget that builds itself based on the latest snapshot of interaction with a [Future].
+
+```dart
+class _FutureBuilderRouteState extends State<FutureBuilderRoute> {
+  Dio dio = Dio();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("httpClient"),
+      ),
+      body: Container(
+        alignment: Alignment.center,
+        child: FutureBuilder(
+          future: dio.get("https://api.github.com/orgs/flutterchina/repos"),
+          builder: (BuildContext context, AsyncSnapshot asyncSnapshot) {
+            // 请求完成
+            if (asyncSnapshot.connectionState == ConnectionState.done) {
+              Response response = asyncSnapshot.data;
+              if (asyncSnapshot.hasError) {
+                return Text(asyncSnapshot.error.toString());
+              }
+              return ListView(
+                // response.data是一个列表，其成员又是map
+                children: response.data
+                    .map<Widget>((e) => ListTile(
+                          title: Text(e["full_name"]),
+                        ))
+                    .toList(),
+              );
+            }
+            // 请求未完成时弹出loading
+            return CircularProgressIndicator();
+          },
+        ),
+      ),
+    );
+  }
+}
+```
+
+
+
+#### 4 Http分块下载
+
+设计一个简单的多线程的文件分块下载器，实现的思路是：
+
+![image-20210520224535251](image/image-20210520224535251.png)
+
+```dart
+/// Downloading by spiting as file in chunks
+Future downloadWithChunks(
+  url,
+  savePath, {
+  ProgressCallback onReceiveProgress,
+}) async {
+  const firstChunkSize = 102;
+  const maxChunk = 3;
+
+  int total = 0;
+  var dio = Dio();
+  var progress = <int>[];
+
+  createCallback(no) {
+    return (int received, _) {
+      progress[no] = received;
+      if (onReceiveProgress != null && total != 0) {
+        onReceiveProgress(progress.reduce((a, b) => a + b), total);
+      }
+    };
+  }
+
+  Future<Response> downloadChunk(url, start, end, no) async {
+    progress.add(0);
+    --end;
+    return dio.download(
+      url,
+      savePath + "temp$no",
+      onReceiveProgress: createCallback(no),
+      options: Options(
+        headers: {"range": "bytes=$start-$end"},
+      ),
+    );
+  }
+
+  Future mergeTempFiles(chunk) async {
+    File f = File(savePath + "temp0");
+    IOSink ioSink= f.openWrite(mode: FileMode.writeOnlyAppend);
+    for (int i = 1; i < chunk; ++i) {
+      File _f = File(savePath + "temp$i");
+      await ioSink.addStream(_f.openRead());
+      await _f.delete();
+    }
+    await ioSink.close();
+    await f.rename(savePath);
+  }
+
+  Response response = await downloadChunk(url, 0, firstChunkSize, 0);
+  if (response.statusCode == 206) {
+    total = int.parse(
+        response.headers.value(HttpHeaders.contentRangeHeader).split("/").last);
+    int reserved = total -
+        int.parse(response.headers.value(HttpHeaders.contentLengthHeader));
+    int chunk = (reserved / firstChunkSize).ceil() + 1;
+    if (chunk > 1) {
+      int chunkSize = firstChunkSize;
+      if (chunk > maxChunk + 1) {
+        chunk = maxChunk + 1;
+        chunkSize = (reserved / maxChunk).ceil();
+      }
+      var futures = <Future>[];
+      for (int i = 0; i < maxChunk; ++i) {
+        int start = firstChunkSize + i * chunkSize;
+        futures.add(downloadChunk(url, start, start + chunkSize, i + 1));
+      }
+      await Future.wait(futures);
+    }
+    await mergeTempFiles(chunk);
+  }
+}
+
+main() async {
+  var url = "http://download.dcloud.net.cn/HBuilder.9.0.2.macosx_64.dmg";
+  var savePath = "./example/HBuilder.9.0.2.macosx_64.dmg";
+  await downloadWithChunks(url, savePath, onReceiveProgress: (received, total) {
+    if (total != -1) {
+      print("${(received / total * 100).floor()}%");
+    }
+  });
+}
+```
+
+
+
+#### 5 使用webSockets
+
+WebSocket会使用http协议握手后创建的tcp链接，和http协议不同的是，WebSocket的tcp链接是个长链接（不会断开），所以服务端与客户端就可以通过此TCP连接进行实时通信。
+
+![image-20210521104016116](image/image-20210521104016116.png)
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:web_socket_channel/io.dart';
+
+class WebSocketRoute extends StatefulWidget {
+  @override
+  _WebSocketRouteState createState() => new _WebSocketRouteState();
+}
+
+class _WebSocketRouteState extends State<WebSocketRoute> {
+  TextEditingController _controller = new TextEditingController();
+  IOWebSocketChannel channel;
+  String _text = "";
+
+
+  @override
+  void initState() {
+    //创建websocket连接
+    channel = new IOWebSocketChannel.connect('ws://echo.websocket.org');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return new Scaffold(
+      appBar: new AppBar(
+        title: new Text("WebSocket(内容回显)"),
+      ),
+      body: new Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: new Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            new Form(
+              child: new TextFormField(
+                controller: _controller,
+                decoration: new InputDecoration(labelText: 'Send a message'),
+              ),
+            ),
+            // StreamBuilder组件将连接到一个Stream， 并在每次收到消息时通知Flutter重新构建界面。
+            new StreamBuilder(
+              stream: channel.stream,
+              builder: (context, snapshot) {
+                //网络不通会走到这
+                if (snapshot.hasError) {
+                  _text = "网络不通...";
+                } else if (snapshot.hasData) {
+                  _text = "echo: "+snapshot.data;
+                }
+                return new Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24.0),
+                  child: new Text(_text),
+                );
+              },
+            )
+          ],
+        ),
+      ),
+      floatingActionButton: new FloatingActionButton(
+        onPressed: _sendMessage,
+        tooltip: 'Send message',
+        child: new Icon(Icons.send),
+      ),
+    );
+  }
+
+  void _sendMessage() {
+    if (_controller.text.isNotEmpty) {
+      channel.sink.add(_controller.text);
+    }
+  }
+
+  @override
+  // 释放连接
+  void dispose() {
+    channel.sink.close();
+    super.dispose();
+  }
+}
+```
+
+当服务器传输的数据是指定为二进制时，`StreamBuilder`的`snapshot.data`的类型就是`List<int>`，是文本时，则为`String`。
+
+
+
+#### 6 Socket API
+
+```dart
+_request() async{
+  //建立连接
+  var socket=await Socket.connect("baidu.com", 80);
+  //根据http协议，发送请求头
+  socket.writeln("GET / HTTP/1.1");
+  socket.writeln("Host:baidu.com");
+  socket.writeln("Connection:close");
+  socket.writeln();
+  await socket.flush(); //发送
+  //读取返回内容
+  _response =await socket.transform(utf8.decoder).join();
+  await socket.close();
+}
+```
+
+
+
+#### 7 Json转Dart Model
+
+##### 自动化生成模板
+
+```yaml
+dependencies:
+  # Your other regular dependencies here
+  json_annotation: ^2.0.0
+
+dev_dependencies:
+  # Your other dev_dependencies here
+  build_runner: ^1.0.0
+  json_serializable: ^2.0.0
+```
+
+```dart
+import 'dart:convert';
+import 'dart:io';
+import 'package:path/path.dart' as path;
+const TAG="\$";
+const SRC="./jsons"; //JSON 目录
+const DIST="lib/models/"; //输出model目录
+
+void walk() { //遍历JSON目录生成模板
+  var src = new Directory(SRC);
+  var list = src.listSync();
+  var template=new File("./template.dart").readAsStringSync();
+  File file;
+  list.forEach((f) {
+    if (FileSystemEntity.isFileSync(f.path)) {
+      file = new File(f.path);
+      var paths=path.basename(f.path).split(".");
+      String name=paths.first;
+      if(paths.last.toLowerCase()!="json"||name.startsWith("_")) return ;
+      if(name.startsWith("_")) return;
+      //下面生成模板
+      var map = json.decode(file.readAsStringSync());
+      //为了避免重复导入相同的包，我们用Set来保存生成的import语句。
+      var set= new Set<String>();
+      StringBuffer attrs= new StringBuffer();
+      (map as Map<String, dynamic>).forEach((key, v) {
+          if(key.startsWith("_")) return ;
+          attrs.write(getType(v,set,name));
+          attrs.write(" ");
+          attrs.write(key);
+          attrs.writeln(";");
+          attrs.write("    ");
+      });
+      String className=name[0].toUpperCase()+name.substring(1);
+      var dist=format(template,[name,className,className,attrs.toString(),
+                                className,className,className]);
+      var _import=set.join(";\r\n");
+      _import+=_import.isEmpty?"":";";
+      dist=dist.replaceFirst("%t",_import );
+      //将生成的模板输出
+      new File("$DIST$name.dart").writeAsStringSync(dist);
+    }
+  });
+}
+
+String changeFirstChar(String str, [bool upper=true] ){
+  return (upper?str[0].toUpperCase():str[0].toLowerCase())+str.substring(1);
+}
+
+//将JSON类型转为对应的dart类型
+ String getType(v,Set<String> set,String current){
+  current=current.toLowerCase();
+  if(v is bool){
+    return "bool";
+  }else if(v is num){
+    return "num";
+  }else if(v is Map){
+    return "Map<String,dynamic>";
+  }else if(v is List){
+    return "List";
+  }else if(v is String){ //处理特殊标志
+    if(v.startsWith("$TAG[]")){
+      var className=changeFirstChar(v.substring(3),false);
+      if(className.toLowerCase()!=current) {
+        set.add('import "$className.dart"');
+      }
+      return "List<${changeFirstChar(className)}>";
+
+    }else if(v.startsWith(TAG)){
+      var fileName=changeFirstChar(v.substring(1),false);
+      if(fileName.toLowerCase()!=current) {
+        set.add('import "$fileName.dart"');
+      }
+      return changeFirstChar(fileName);
+    }
+    return "String";
+  }else{
+    return "String";
+  }
+ }
+
+//替换模板占位符
+String format(String fmt, List<Object> params) {
+  int matchIndex = 0;
+  String replace(Match m) {
+    if (matchIndex < params.length) {
+      switch (m[0]) {
+        case "%s":
+          return params[matchIndex++].toString();
+      }
+    } else {
+      throw new Exception("Missing parameter for string format");
+    }
+    throw new Exception("Invalid format string: " + m[0].toString());
+  }
+  return fmt.replaceAllMapped("%s", replace);
+}
+
+void main(){
+  walk();
+}
+```
+
+```sh
+dart mo.dart
+flutter packages pub run build_runner build --delete-conflicting-outputs
+```
+
+
+
+##### 使用Json_model包(不可用)
+
+```yaml
+dev_dependencies:
+  json_model: ^0.0.2
+  build_runner: ^1.0.0
+  json_serializable: ^2.0.0
+```
+
+案例：
+
+File: `jsons/user.json`
+
+```json
+{
+  "name":"wendux",
+  "father":"$user", //Other class model 
+  "friends":"$[]user", // Array  
+  "keywords":"$[]String", // Array
+  "age":20
+}
+```
+
+Run `pub run json_model`, then you'll see the generated json file under`lib/models/` dir:
+
+```dart
+import 'package:json_annotation/json_annotation.dart';
+part 'user.g.dart';
+
+@JsonSerializable()
+class User {
+    User();
+    
+    String name;
+    User father;
+    List<User> friends;
+    List<String> keywords;
+    num age;
+    
+    factory User.fromJson(Map<String,dynamic> json) => _$UserFromJson(json);
+    Map<String, dynamic> toJson() => _$UserToJson(this);
+}
+```
+
+
+
+### 十二、三 暂未学习（*）
+
+
+
+
+
+### 十四、Flutter核心原理
+
+
+
+
+
+
+
+### 十五、Flutter实战
