@@ -55,7 +55,7 @@ OC程序的编译、链接、执行
   ```objective-c
   @interface 类名:NSObject
   {
-      // 加上@public 关键字，则可以通过对象访问
+      // 加上@public 关键字，则可以通过对象访问属性
       类的数据成员（变量一般为下划线_开头，私有属性）
   }
   方法的声明写在这里
@@ -594,7 +594,7 @@ OC中**static关键字不能修饰类中的属性和方法**，但是可以修�
 
 ![image-20210420152349188](image/image-20210420152349188.png)
 
-super只能调用父类的方法，不能调用属性。
+super只能调用父类的方法，不能调用属性（属性一般是私有的，子类无法直接访问）。
 
 虽然使用self也可以实现调用从父类继承的方法，但是使用super来调用更加合理。
 
@@ -668,7 +668,7 @@ super只能调用父类的方法，不能调用属性。
 
 #### 多态
 
-指的是同一个行为，对于不同的事物具体完全不同的表现形式。
+指的是同一个行为，对于不同的事物具有完全不同的表现形式。
 
 
 
@@ -1127,7 +1127,7 @@ Person *p1 = [[Person alloc] init];
 }
 @property NSString *name;
 @property int age;
-- (void) initWithName:(NSString *)name andAge:(int) age;
+- (instancetype) initWithName:(NSString *)name andAge:(int) age;
 @end
     
 // Person.m
@@ -1594,7 +1594,7 @@ int main(){
 
 ```objective-c
 __strong Person *p1 = [Person new];  // 默认是强指针
-__weak Person *p2 = p1;  // p2是弱指针
+__weak Person *p2 = p1;  // p2是弱指针，不会增加对象的引用计数
 p1 = nil;  // p1不再指向对象，那么对象会立即被回收，p2是弱指针
 ```
 
@@ -2063,7 +2063,7 @@ Student<StudyProtocal> *stu = [Student new];
 #import <Foundation/Foundation.h>
 #import "GFProtocal.h"
 @interface Girl : NSObject <GFProtocal>
-@property(nonatomic,assign) NSString *name
+@property(nonatomic,strong) NSString *name
 @end
     
 // Girl.m
@@ -2218,7 +2218,7 @@ rangeOfString
 
 ![image-20210428222455140](image/image-20210428222455140.png)
 
-#### NSSRange
+#### NSRange
 
 ![image-20210428225922416](image/image-20210428225922416.png)
 
@@ -2400,6 +2400,7 @@ for(id str in arr){
 ```objective-c
 // 简便写法
 int num = 10;
+// 使用@符号标识oc对象 实际上声明c的变量 再变成oc即可
 NSNumber *n1 = @(num);
 ```
 
